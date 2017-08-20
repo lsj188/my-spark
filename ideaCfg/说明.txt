@@ -1,0 +1,3 @@
+idea工具
+WeidMonokai-Colors.icls    为字体及颜色风格
+codetemplates.xml          为代码格式需要安装eclipseformatter插件，安装后重启选Eclipse code formatter
