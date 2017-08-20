@@ -167,7 +167,7 @@
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
             <PATH_ELEMENT>
-              <option name="myItemId" value="test" />
+              <option name="myItemId" value="lsj" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -208,6 +208,8 @@
   </component>
   <component name="RecentsManager">
     <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
+      <recent name="cn.lsj" />
+      <recent name="" />
       <recent name="cn.lsj.test" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
@@ -630,7 +632,7 @@
       <workItem from="1502724830141" duration="1409000" />
       <workItem from="1502805240155" duration="3006000" />
       <workItem from="1502814230457" duration="200000" />
-      <workItem from="1503219700836" duration="2375000" />
+      <workItem from="1503219700836" duration="2965000" />
     </task>
     <servers />
   </component>
@@ -640,7 +642,7 @@
     </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="9369000" />
+    <option name="totallyTimeSpent" value="9959000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
