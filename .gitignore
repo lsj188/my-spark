@@ -1,9 +1,12 @@
 ##ignore this file##
+.makev
 .classpath
 .project
 .settings
 */.idea
 */target
+*.iml
+*.swp
  ##filter databfile¡¢sln file##
 *.mdb
 *.ldb

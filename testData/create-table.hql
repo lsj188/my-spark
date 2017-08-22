@@ -4,7 +4,9 @@ CREATE TABLE mytest.t_dim_regio
   regio_id               INTEGER                      , 
   regio_name             CHARACTER VARYING(50)        
   update_time            BIGINT      
-);
+) row format delimited
+fields terminated by ','
+lines terminated by '\n';
 
 --drop table mytest.t_dim_date;
 CREATE TABLE mytest.t_dim_date
@@ -15,7 +17,8 @@ CREATE TABLE mytest.t_dim_date
   day                    int         ,
   week                   int         , 
   quarter                int         
-);
+)fields terminated by ','
+ lines terminated by '\n';
 
 --drop table mytest.t_iete_flow;
 CREATE TABLE mytest.t_iete_flow
@@ -26,7 +29,8 @@ CREATE TABLE mytest.t_iete_flow
   regio_id               INTEGER                      , 
   cell_flag	             INTEGER,    	
   flow                   NUMERIC(28,4)                    
-)
+)fields terminated by ','
+ lines terminated by '\n'
 WITH (
   OIDS=FALSE
 )
@@ -52,7 +56,8 @@ CREATE TABLE mytest.t_iete_usrlove_subclass_mstype_m
   lte_flow_flag	         INTEGER,
   flow                   NUMERIC(28,4)                    
 
-)
+)fields terminated by ','
+ lines terminated by '\n'
 WITH (
   OIDS=FALSE
 )
@@ -66,16 +71,16 @@ PARTITION BY RANGE(tim_id)
 ALTER TABLE mytest.t_iete_usrlove_subclass_mstype_m
   OWNER TO gpadmin;
 COMMENT ON TABLE mytest.t_iete_usrlove_subclass_mstype_m
-  IS 'ÓÃ»§ÒµÎñÆ«ºÃ-¼´Ï¯²éÑ¯-ÒµÎñÐ¡Àà-ÔÂ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.tim_id             IS 'Ê±¼ä        ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.hour_region        IS 'Ê±¶ÎÇø     ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.mdn                IS 'ÓÃ»§ºÅÂë    ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.imsi               is 'ÓÃ»§IMSI    ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.regio_id           is 'µØÊÐID      ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.regio_name         is 'µØÊÐ        ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.flow               is 'Á÷Á¿        ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.gsm_flow_flag      is '2gÁ÷Á¿µµ±ê¼Ç	1¡¢0-100£¬2¡¢100-200£¬3¡¢200-300£¬4¡¢300ÒÔÉÏ  ';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.td_flow_flag       is 'tdÁ÷Á¿µµ±ê¼Ç';
-COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.lte_flow_flag      is 'lteÁ÷Á¿µµ±ê¼Ç ';
+  IS 'ï¿½Ã»ï¿½Òµï¿½ï¿½Æ«ï¿½ï¿½-ï¿½ï¿½Ï¯ï¿½ï¿½Ñ¯-Òµï¿½ï¿½Ð¡ï¿½ï¿½-ï¿½ï¿½';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.tim_id             IS 'Ê±ï¿½ï¿½        ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.hour_region        IS 'Ê±ï¿½ï¿½ï¿½ï¿½     ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.mdn                IS 'ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½    ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.imsi               is 'ï¿½Ã»ï¿½IMSI    ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.regio_id           is 'ï¿½ï¿½ï¿½ï¿½ID      ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.regio_name         is 'ï¿½ï¿½ï¿½ï¿½        ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.flow               is 'ï¿½ï¿½ï¿½ï¿½        ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.gsm_flow_flag      is '2gï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½	1ï¿½ï¿½0-100ï¿½ï¿½2ï¿½ï¿½100-200ï¿½ï¿½3ï¿½ï¿½200-300ï¿½ï¿½4ï¿½ï¿½300ï¿½ï¿½ï¿½ï¿½  ';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.td_flow_flag       is 'tdï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½';
+COMMENT ON COLUMN mytest.t_iete_usrlove_subclass_mstype_m.lte_flow_flag      is 'lteï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ';
 
---µØÊÐÖÜÄÚÁ÷Á¿Ç°10ÓÃ»§
+--ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°10ï¿½Ã»ï¿½
