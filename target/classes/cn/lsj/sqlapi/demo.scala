@@ -1,7 +1,8 @@
 package cn.lsj.sqlapi
 
+import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{SaveMode, Row, SQLContext}
+import org.apache.spark.sql.{Row, SQLContext, SaveMode}
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
@@ -14,8 +15,75 @@ object demo {
 
     //    sql1 //使用反射机制推断RDD Schema
     //    sql2 //以编程方式定义RDD Schema。
-    demofile2parquet() //文本文件转为parquet文件
-    readParquet()      //读取parquet文件
+//    demofile2parquet() //文本文件转为parquet文件
+//    readParquet() //读取parquet文件
+//    partParquet() //分区表
+    hivesql()     //执行hive sql
+//    useJson()
+  }
+/**
+ * json
+ * */
+def useJson(): Unit ={
+  val infileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
+  val outfileName="E:\\tmp\\dim_date.json"
+  val (sc,sqlContext)=initSpark()
+  val parquetDF=sqlContext.read.parquet(infileName)
+  parquetDF.write.mode(SaveMode.Append).json(outfileName)
+  val jsonDF=sqlContext.read.json(outfileName)
+  jsonDF.createTempView("json_dim_date")
+  val resultDF=sqlContext.sql("select count(*) as cnt from json_dim_date")
+  resultDF.show()
+  sc.stop()
+}
+  /**
+   * HiveContext
+   * 操作Hive数据源须创建SQLContext的子类HiveContext对象。
+   * Standalone集群：添加hive-site.xml到$SPARK_HOME/conf目录。
+   * YARN集群：添加hive-site.xml到$YARN_CONF_DIR目录；添加Hive元数据库JDBC驱动jar文件到$HADOOP_HOME/lib目录。
+   * 最简单方法：通过spark-submit命令参数--file和--jar参数分别指定hive-site.xml和Hive元数据库JDBC驱动jar文件。
+   * 未找到hive-site.xml：当前目录下自动创建metastore_db和warehouse目录。
+   * */
+
+   def hivesql(): Unit ={
+    //获取SparkContext, SQLContext
+    val (sc, sqlContext) = initSpark()
+    val hiveContext=new HiveContext(sc)
+    //val sql="CREATE TABLE lsj_test.t_dim_date_p\n(\n  date                   BIGINT      ,\n  year                   int         ,\n  month                  int         ,\n  day                    int         ,\n  week                   int         ,\n  quarter                int\n)\nROW FORMAT SERDE 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe' stored as\nINPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'"
+    //hiveContext.sql(sql)
+
+    val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
+    val parquetDF = sqlContext.read.parquet(fileName)
+    parquetDF.createOrReplaceTempView("parquetFile")
+    hiveContext.sql("insert overwrite table lsj_test.t_dim_date_p select * from parquetFile")
+    val htab=hiveContext.sql("select * from lsj_test.t_dim_date_p")
+    htab.show(100)
+    sc.stop()
+  }
+
+  /**
+   * parquet分区
+   **/
+  def partParquet(): Unit = {
+    //获取SparkContext, SQLContext
+    val (sc, sqlContext) = initSpark()
+    val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
+    val parquetDF=sqlContext.read.parquet(fileName)
+    parquetDF.createOrReplaceTempView("parquetFile")
+    val part1=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =1")
+    part1.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=1")
+    val part2=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =2")
+    part2.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=2")
+    val part3=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =3")
+    part3.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=3")
+    val part4=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =4")
+    part4.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=4")
+    //////////////////////////////////////////////////////
+    val partparquetDF=sqlContext.read.option("mergeSchema","true").parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part")
+    parquetDF.show()
+    parquetDF.printSchema()
+    sc.stop()
+
   }
 
   /**
@@ -28,7 +96,6 @@ object demo {
    **/
   def readParquet(): Unit = {
     //获取SparkContext, SQLContext
-
     val (sc, sqlContext) = initSpark()
     val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
     val parquetDF = sqlContext.read.parquet(fileName)
@@ -60,7 +127,7 @@ object demo {
     val inPath = hadoopdsPath + "/lsj_test/"
     val outPath = hadoopdsPath + "/lsj_test/parquet/"
     val tabName = "dim_date"
-    text2parquet(sqlContext, inPath, outPath, schema, tabName)
+    txt2parquet(sqlContext, inPath, outPath, schema, tabName)
 
     sc.stop()
   }
@@ -73,16 +140,18 @@ object demo {
    * schema
    * tablename
    **/
-  def text2parquet(sqlContext: SQLContext, inPath: String, outPath: String, schema: StructType, tablename: String) {
+  def txt2parquet(sqlContext: SQLContext, inPath: String, outPath: String, schema: StructType, tablename: String) {
     // import text-based table first into a data frame
     //    val df = sqlContext.read.format("com.databricks.spark.csv").schema(schema).option("delimiter", "|").load(inPath + tablename + "/*")
     val df = sqlContext.read.format("com.databricks.spark.csv").schema(schema).option("delimiter", ",").load(inPath + tablename + "/*")
     // now simply write to a parquet file
     //    df.show(20)
 
-    df.write.mode(SaveMode.Overwrite).format("parquet").option("delimiter","|").save(outPath + tablename)
-    df.write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv").option("delimiter","|").save("E:\\tmp\\" + tablename)
-//    df.write.parquet(outPath + tablename)
+    df.write.mode(SaveMode.Overwrite).format("parquet").option("delimiter", "|").save(outPath + tablename)
+
+    //保存为txt文件
+    //    df.write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv").option("delimiter","|").save("E:\\tmp\\" + tablename)
+    //    df.write.parquet(outPath + tablename)
   }
 
   /**
@@ -162,6 +231,7 @@ object demo {
    * 初使化spark
    **/
   def initSpark(): (SparkContext, SQLContext) = {
+//    val conf = new SparkConf().setMaster("yarn-client").setAppName("Test")
     val conf = new SparkConf().setMaster("local").setAppName("Test")
     val sc = new SparkContext(conf)
     val sqlContext = new SQLContext(sc)
