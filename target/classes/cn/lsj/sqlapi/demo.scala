@@ -1,5 +1,8 @@
 package cn.lsj.sqlapi
 
+import java.util.Properties
+
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types._
@@ -17,54 +20,89 @@ object demo {
 
     //    sql1 //使用反射机制推断RDD Schema
     //    sql2 //以编程方式定义RDD Schema。
-//    demofile2parquet() //文本文件转为parquet文件
-//    readParquet() //读取parquet文件
-//    partParquet() //分区表
-//    hivesql()     //执行hive sql
-//    useJson()
-    useFunctions()
+    //    demofile2parquet() //文本文件转为parquet文件
+    //    readParquet() //读取parquet文件
+    //    partParquet() //分区表
+    //    hivesql()     //执行hive sql
+    //    useJson()
+//    useFunctions()
+    useJDBC()
   }
+
+  /**
+   * 连接jdbc数据源
+   **/
+  def useJDBC(): Unit = {
+    val (sc, sqlContext) = initSpark()
+    val parquetDF=sqlContext.read.parquet("E:\\git\\my-spark\\spark-warehouse\\saveastab_test/")
+    val jdbcConnectionProperties=new Properties()
+    jdbcConnectionProperties.put("user","root")
+    jdbcConnectionProperties.put("password","lsj123")
+    parquetDF.show()
+    parquetDF.write.mode(SaveMode.Append).jdbc("jdbc:mysql://localhost:3306/test","saveastab_test",jdbcConnectionProperties)
+
+    val jdbcDF = sqlContext.read.format("jdbc").option("url", "jdbc:mysql://localhost:3306/test")
+      .option("dbtable", "saveastab_test")
+      .option("user","root")
+      .option("password","lsj123")
+      .load()
+    jdbcDF.show()
+  }
+
   /**
    * 函数使用
    *
-   * */
-def useFunctions(): Unit ={
+   **/
+  def useFunctions(): Unit = {
     val (sc, sqlContext) = initSpark()
-    val parquetDF=sqlContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
+    val parquetDF = sqlContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
     parquetDF.createTempView("test_dim_time")
-    val tabDF=sqlContext.sql("select * from test_dim_time")
-    println("tabDF=",tabDF.count())
+    val tabDF = sqlContext.sql("select * from test_dim_time")
+    println("tabDF=", tabDF.count())
 
     //选择列
-    val joinDF=tabDF.join(parquetDF,Seq("date"),"inner").select(tabDF.col("date"),parquetDF.col("month"))
+    val joinDF = tabDF.join(parquetDF, Seq("date"), "inner").select(tabDF.col("date"), parquetDF.col("month"))
     joinDF.show(10)
 
     //聚合
-    joinDF.groupBy(joinDF.col("month")).agg(sum("date").as("sum_date"),count("month").as("cnt"),avg("date").as("date_avg")).show(12)
+    joinDF.groupBy(joinDF.col("month")).agg(sum("date").as("sum_date"), count("month").as("cnt"), avg("date").as("date_avg")).show(12)
 
     //字段计算
-//    joinDF.withColumn("date1",joinDF.col("date")+1).withColumn("date+month",joinDF.col("date")+joinDF.col("month")).show(10)
+    //    joinDF.withColumn("date1",joinDF.col("date")+1).withColumn("date+month",joinDF.col("date")+joinDF.col("month")).show(10)
 
 
     //开窗函数的使用，分析函org.apache.spark.sql.functions包中可查看支持哪些函数
-//    joinDF.withColumn("rn",row_number().over(Window.partitionBy("month").orderBy("date"))).filter("rn=1").show(100)
+    //    joinDF.withColumn("rn",row_number().over(Window.partitionBy("month").orderBy("date"))).filter("rn=1").show(100)
+    val joinDF1 = joinDF.withColumn("month_sum_date", sum("date").over(Window.partitionBy("month"))).
+      withColumn("rn", row_number().over(Window.partitionBy("month").orderBy("date"))).filter("rn=1")
+//    joinDF1.show(100)
+
+    //将DataFrame存为表，可分区，分桶
+    joinDF1.coalesce(1).write.mode(SaveMode.Overwrite).bucketBy(4, "date").partitionBy("month").saveAsTable("saveastab_test")
+
+    sqlContext.sql("select * from saveastab_test").show(100)
+
+    sc.stop()
+
+
   }
 
- /**
- * json
- * */
-def useJson(): Unit ={
-  val infileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
-  val outfileName="E:\\tmp\\dim_date.json"
-  val (sc,sqlContext)=initSpark()
-  val parquetDF=sqlContext.read.parquet(infileName)
-  parquetDF.write.mode(SaveMode.Append).json(outfileName)
-  val jsonDF=sqlContext.read.json(outfileName)
-  jsonDF.createTempView("json_dim_date")
-  val resultDF=sqlContext.sql("select count(*) as cnt from json_dim_date")
-  resultDF.show()
-  sc.stop()
-}
+  /**
+   * json
+   **/
+  def useJson(): Unit = {
+    val infileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
+    val outfileName = "E:\\tmp\\dim_date.json"
+    val (sc, sqlContext) = initSpark()
+    val parquetDF = sqlContext.read.parquet(infileName)
+    parquetDF.write.mode(SaveMode.Append).json(outfileName)
+    val jsonDF = sqlContext.read.json(outfileName)
+    jsonDF.createTempView("json_dim_date")
+    val resultDF = sqlContext.sql("select count(*) as cnt from json_dim_date")
+    resultDF.show()
+    sc.stop()
+  }
+
   /**
    * HiveContext
    * 操作Hive数据源须创建SQLContext的子类HiveContext对象。
@@ -72,29 +110,29 @@ def useJson(): Unit ={
    * YARN集群：添加hive-site.xml到$YARN_CONF_DIR目录；添加Hive元数据库JDBC驱动jar文件到$HADOOP_HOME/lib目录。
    * 最简单方法：通过spark-submit命令参数--file和--jar参数分别指定hive-site.xml和Hive元数据库JDBC驱动jar文件。
    * 未找到hive-site.xml：当前目录下自动创建metastore_db和warehouse目录。
-   * */
+   **/
 
-   def hivesql(): Unit ={
+  def hivesql(): Unit = {
     //获取SparkContext, SQLContext
     val (sc, sqlContext) = initSpark()
-    val hiveContext=new HiveContext(sc)
+    val hiveContext = new HiveContext(sc)
     //val sql="CREATE TABLE lsj_test.t_dim_date_p\n(\n  date                   BIGINT      ,\n  year                   int         ,\n  month                  int         ,\n  day                    int         ,\n  week                   int         ,\n  quarter                int\n)\nROW FORMAT SERDE 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe' stored as\nINPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'"
     //hiveContext.sql(sql)
 
     val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
-//    val parquetDF = sqlContext.read.parquet(fileName)
-//    parquetDF.createOrReplaceTempView("parquetFile")
-//    hiveContext.sql("insert overwrite table lsj_test.t_dim_date_p select * from parquetFile")
-//    hiveContext.sql("create table lsj_test.t_dim_date_p1 as select * from lsj_test.t_dim_date_p")
-//    val htab=hiveContext.sql("select * from lsj_test.t_dim_date_p1")
-//    htab.show(100)
-//    htab.write.parquet("")
-    val parquetDF=hiveContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
+    //    val parquetDF = sqlContext.read.parquet(fileName)
+    //    parquetDF.createOrReplaceTempView("parquetFile")
+    //    hiveContext.sql("insert overwrite table lsj_test.t_dim_date_p select * from parquetFile")
+    //    hiveContext.sql("create table lsj_test.t_dim_date_p1 as select * from lsj_test.t_dim_date_p")
+    //    val htab=hiveContext.sql("select * from lsj_test.t_dim_date_p1")
+    //    htab.show(100)
+    //    htab.write.parquet("")
+    val parquetDF = hiveContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
     parquetDF.createTempView("test_dim_time")
-    val tabDF=sqlContext.sql("select * from test_dim_time")
+    val tabDF = sqlContext.sql("select * from test_dim_time")
     tabDF.show(10)
-    println("tabDF=",tabDF.count())
-    val joinCnt=tabDF.join(parquetDF,Seq("date"),"inner").select(tabDF.col("date"),parquetDF.col("month"))  //选择列
+    println("tabDF=", tabDF.count())
+    val joinCnt = tabDF.join(parquetDF, Seq("date"), "inner").select(tabDF.col("date"), parquetDF.col("month")) //选择列
 
     sc.stop()
   }
@@ -106,18 +144,18 @@ def useJson(): Unit ={
     //获取SparkContext, SQLContext
     val (sc, sqlContext) = initSpark()
     val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
-    val parquetDF=sqlContext.read.parquet(fileName)
+    val parquetDF = sqlContext.read.parquet(fileName)
     parquetDF.createOrReplaceTempView("parquetFile")
-    val part1=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =1")
-    part1.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=1")
-    val part2=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =2")
-    part2.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=2")
-    val part3=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =3")
-    part3.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=3")
-    val part4=sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =4")
-    part4.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part/quarter=4")
+    val part1 = sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =1")
+    part1.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath + "/lsj_test/parquet/dim_date_part/quarter=1")
+    val part2 = sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =2")
+    part2.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath + "/lsj_test/parquet/dim_date_part/quarter=2")
+    val part3 = sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =3")
+    part3.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath + "/lsj_test/parquet/dim_date_part/quarter=3")
+    val part4 = sqlContext.sql("select time_day, year, month, day, week from parquetFile where quarter =4")
+    part4.write.mode(SaveMode.Overwrite).parquet(hadoopdsPath + "/lsj_test/parquet/dim_date_part/quarter=4")
     //////////////////////////////////////////////////////
-    val partparquetDF=sqlContext.read.option("mergeSchema","true").parquet(hadoopdsPath +"/lsj_test/parquet/dim_date_part")
+    val partparquetDF = sqlContext.read.option("mergeSchema", "true").parquet(hadoopdsPath + "/lsj_test/parquet/dim_date_part")
     parquetDF.show()
     parquetDF.printSchema()
     sc.stop()
@@ -269,7 +307,7 @@ def useJson(): Unit ={
    * 初使化spark
    **/
   def initSpark(): (SparkContext, SQLContext) = {
-//    val conf = new SparkConf().setMaster("yarn-client").setAppName("Test")
+    //    val conf = new SparkConf().setMaster("yarn-client").setAppName("Test")
     val conf = new SparkConf().setMaster("local").setAppName("Test")
     val sc = new SparkContext(conf)
     val sqlContext = new SQLContext(sc)
