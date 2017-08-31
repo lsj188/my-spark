@@ -1,5 +1,7 @@
 package cn.lsj.sqlapi
 
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SQLContext, SaveMode}
@@ -7,6 +9,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 /**
  * Created by lsj on 2017/8/22.
+ * http://spark.apache.org/docs/latest/sql-programming-guide.html#loading-data-programmatically
  */
 object demo {
   val hadoopdsPath = "hdfs://localhost:9000"
@@ -18,10 +21,39 @@ object demo {
 //    demofile2parquet() //文本文件转为parquet文件
 //    readParquet() //读取parquet文件
 //    partParquet() //分区表
-    hivesql()     //执行hive sql
+//    hivesql()     //执行hive sql
 //    useJson()
+    useFunctions()
   }
-/**
+  /**
+   * 函数使用
+   *
+   * */
+def useFunctions(): Unit ={
+    val (sc, sqlContext) = initSpark()
+    val parquetDF=sqlContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
+    parquetDF.createTempView("test_dim_time")
+    val tabDF=sqlContext.sql("select * from test_dim_time")
+    println("tabDF=",tabDF.count())
+
+    //选择列
+    val joinDF=tabDF.join(parquetDF,Seq("date"),"inner").select(tabDF.col("date"),parquetDF.col("month"))
+    joinDF.show(10)
+
+    //聚合
+    joinDF.groupBy(joinDF.col("month")).agg(sum("date").as("sum_date"),count("month").as("cnt"),avg("date").as("date_avg")).show(12)
+
+    //字段计算
+//    joinDF.withColumn("date1",joinDF.col("date")+1).withColumn("date+month",joinDF.col("date")+joinDF.col("month")).show(10)
+
+
+    //开窗函数的使用，分析函org.apache.spark.sql.functions包中可查看支持哪些函数
+//    joinDF.withColumn("rn",row_number().over(Window.partitionBy("month").orderBy("date"))).filter("rn=1").show(100)
+    joinDF.withColumn("month_sum_date",sum("date").over(Window.partitionBy("month"))).withColumn("rn",row_number().over(Window.partitionBy("month").orderBy("date"))).filter("rn=1").show(100)
+
+  }
+
+ /**
  * json
  * */
 def useJson(): Unit ={
@@ -53,11 +85,20 @@ def useJson(): Unit ={
     //hiveContext.sql(sql)
 
     val fileName = hadoopdsPath + "/lsj_test/parquet/dim_date"
-    val parquetDF = sqlContext.read.parquet(fileName)
-    parquetDF.createOrReplaceTempView("parquetFile")
-    hiveContext.sql("insert overwrite table lsj_test.t_dim_date_p select * from parquetFile")
-    val htab=hiveContext.sql("select * from lsj_test.t_dim_date_p")
-    htab.show(100)
+//    val parquetDF = sqlContext.read.parquet(fileName)
+//    parquetDF.createOrReplaceTempView("parquetFile")
+//    hiveContext.sql("insert overwrite table lsj_test.t_dim_date_p select * from parquetFile")
+//    hiveContext.sql("create table lsj_test.t_dim_date_p1 as select * from lsj_test.t_dim_date_p")
+//    val htab=hiveContext.sql("select * from lsj_test.t_dim_date_p1")
+//    htab.show(100)
+//    htab.write.parquet("")
+    val parquetDF=hiveContext.read.parquet("e:/git/my-spark/spark-warehouse/lsj_test.db/t_dim_date_p")
+    parquetDF.createTempView("test_dim_time")
+    val tabDF=sqlContext.sql("select * from test_dim_time")
+    tabDF.show(10)
+    println("tabDF=",tabDF.count())
+    val joinCnt=tabDF.join(parquetDF,Seq("date"),"inner").select(tabDF.col("date"),parquetDF.col("month"))  //选择列
+
     sc.stop()
   }
 
