@@ -39,8 +39,11 @@ object demo {
     jdbcConnectionProperties.put("user","root")
     jdbcConnectionProperties.put("password","lsj123")
     parquetDF.show()
+
+    //写入mysql数据库表，当mode为SaveMode.OverWrite时，会先删表再创建表
     parquetDF.write.mode(SaveMode.Append).jdbc("jdbc:mysql://localhost:3306/test","saveastab_test",jdbcConnectionProperties)
 
+    //读取关系数据库表
     val jdbcDF = sqlContext.read.format("jdbc").option("url", "jdbc:mysql://localhost:3306/test")
       .option("dbtable", "saveastab_test")
       .option("user","root")
