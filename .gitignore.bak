@@ -5,7 +5,6 @@
 .settings
 */.idea
 */target
-*/testData
 *.iml
 *.swp
  ##filter databfile¡¢sln file##
