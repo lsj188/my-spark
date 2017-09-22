@@ -34,7 +34,7 @@ object init {
         // 注册自定义类型，默认只支持常用类型，如有比较复杂的类型及自定义类型需要注册
         //    conf.set("spark.kryo.registrator", "com.ultrapower.noas.javaspark.tools.Registorator");
         //决定了能够传输消息的最大值（默认为10M），单位M，当应用里有需要传输大数据量的时候可以调整此参数
-        conf.set("spark.akka.frameSize", "1000")
+        conf.set("spark.akka.frameSize", "100")
         //Spark内存缓存的堆大小占用总内存比例（默认0.6），不能大于JVM Old区内存大小
         conf.set("spark.storage.memoryFraction", "0.4")
         conf.set("spark.shuffle.manager", "sort") // 采用sort shuffle，有两种可用的实现：sort和hash
@@ -74,9 +74,12 @@ class CoursesSum() extends Serializable {
             "E:\\git\\my-spark\\testData\\test.courses.sum2",
             "E:\\git\\my-spark\\testData\\test.courses.join1",
             "E:\\git\\my-spark\\testData\\test.courses.leftjoin",
-            "E:\\git\\my-spark\\testData\\test.courses.rightjoin"
+            "E:\\git\\my-spark\\testData\\test.courses.rightjoin",
+            "E:\\git\\my-spark\\testData\\test.courses.mapjoin"
         )
         val (sc, sqlContext) = init.initSpark("local", "coureseSum")
+
+
         // 删除目标路径
         try {
             for (path <- outFiles)
@@ -85,18 +88,24 @@ class CoursesSum() extends Serializable {
             case ex: IOException => ex.printStackTrace()
         }
 
-        val coureseRdd = sc.textFile(inFiles(0)).map(_.split(","))
+
+        //        val coureseRdd = sc.textFile(inFiles(0) + "\\*").map(_.split(","))
+        //wholeTextFiles方法生成的RDD为（K，V）,K为文件名路径，V为整个文件的内容，当小文件多时可以使用
+        val coureseRdd = sc.wholeTextFiles(inFiles(0) + "\\*").flatMap((file)=>for (i <- file._2.split("\n")) yield i.split(","))
+
         //缓存RDD数据
         coureseRdd.persist(StorageLevel.MEMORY_AND_DISK)
+
         //按类型和级别统计人数
         val students = coureseRdd
           .map((cols: Array[String]) => ((cols(0), cols(1)), cols(6).toLong))
           .reduceByKey(_ + _)
-          .coalesce(1) //缩减文件数
+          .coalesce(10) //缩减文件数
           .sortBy((x) => (x._1._1, x._2), false) //降序排序
-          .map((s) => s._1._1 + "," + s._1._2 + "," + s._2) //处理文件输出格式
+          .map((s) => s._1._1 + "," + s._1._2 + "," + s._2).coalesce(1) //处理文件输出格式
         students.take(20).foreach(println) //取前20条数据打印
-        students.saveAsTextFile(outFiles(0))
+//        students.saveAsTextFile(outFiles(0))
+
 
         //按级别统计人数及课程门数
         val levelStudents = coureseRdd
@@ -104,31 +113,66 @@ class CoursesSum() extends Serializable {
           .reduceByKey((a, b) => a) //数据去重
           .map((row) => (row._1._1, (row._1._3, row._2))) //重新构建K，V()
           .reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2))
-          .map((row) => List(row._1, row._2._1, row._2._2).mkString(",")) // 处理文件输入格式
-        levelStudents.saveAsTextFile(outFiles(1))
+          .map((row) => List(row._1, row._2._1, row._2._2).mkString(",")).coalesce(1) // 处理文件输入格式
+//        levelStudents.saveAsTextFile(outFiles(1))
 
         val leftRdd = students.map((line) => {
             val cols = line.split(",")
             (cols(1), cols)
         }) //处理成可关联的K，V
+//        leftRdd.saveAsTextFile(outFiles(3))
+
         val rightRdd = levelStudents.union(sc.parallelize(Seq(List("未知", "123", "456").mkString(","), List("未知1", "1231", "4561").mkString(",")))).map((line) => {
-                val cols = line.split(",")
-                (cols(0), cols)
-            }) //处理成可关联的K，V
+            val cols = line.split(",")
+            (cols(0), cols)
+        }) //处理成可关联的K，V
+//        leftRdd.saveAsTextFile(outFiles(4))
+
+
+        //==================join===================
         val innerjoinRdd = leftRdd
-              .join(rightRdd) //处理成可关联的K，V
-              .map((obj) => obj._2._1.mkString(",") + "," + obj._2._2.mkString(",")) //拼接关联结果
+          .join(rightRdd) //处理成可关联的K，V
+          .map((obj) => obj._2._1.mkString(",") + "," + obj._2._2.mkString(",")).coalesce(1) //拼接关联结果
         innerjoinRdd.saveAsTextFile(outFiles(2))
+        //
+        //
+        //        val leftJoinRdd = leftRdd.leftOuterJoin(rightRdd).map((obj) => obj._2._1.mkString(",") + "," + (obj._2._2 match {
+        //            case Some(a) => a.mkString(",")
+        //            case None => "No this Skill"
+        //        })).coalesce(1)
+        ////        leftJoinRdd.saveAsTextFile(outFiles(3))
+        //
+        //
+        //        val rightJoinRdd = leftRdd.rightOuterJoin(rightRdd).map((obj) => (obj._2._1 match {
+        //            case Some(a) => a.mkString(",")
+        //            case None => "No this Skill"
+        //        }) + "," + obj._2._2.mkString(",")).coalesce(1)
+        //        rightJoinRdd.saveAsTextFile(outFiles(4))
+        //==================join===================
 
-        val leftJoinRdd = leftRdd.leftOuterJoin(rightRdd).map((obj) => obj._2._1.mkString(",") + "," + (obj._2._2 match {
-            case Some(a) => a.mkString(",")
-            case None => "No this Skill"
-        })).coalesce(1).saveAsTextFile(outFiles(3))
-        val rightJoinRdd = leftRdd.rightOuterJoin(rightRdd).map((obj) => (obj._2._1 match {
-            case Some(a) => a.mkString(",")
-            case None => "No this Skill"
-        }) + "," + obj._2._2.mkString(",")).coalesce(1).saveAsTextFile(outFiles(4))
 
+        //================mapjoin==================
+        import scala.collection.mutable.Map
+
+        //提取RDD数据放入Map中
+        val levelSumMap = Map[String, String]()
+        for (i <- rightRdd.collect())
+            levelSumMap += (i._1 -> i._2.mkString(","))
+
+        //定义广播变量
+        val bcLevel = sc.broadcast(levelSumMap)
+
+        //map端join
+        val mapJoin = leftRdd.map((obj) => {
+            val levelLine = bcLevel.value.get(obj._1) //获取广播变量数据并
+            obj._2.mkString(",") + "," + (levelLine match {
+                case Some(a) => a
+                case None => "No match"
+            })
+        }).coalesce(1)
+        mapJoin.saveAsTextFile(outFiles(5))
+
+        //================mapjoin==================
 
 
 
