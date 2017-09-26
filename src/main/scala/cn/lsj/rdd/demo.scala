@@ -119,7 +119,7 @@ class CoursesSum() extends Serializable {
           .reduceByKey((a, b) => a) //数据去重
           .map((row) => (row._1._1, (row._1._3, row._2))) //重新构建K，V()
 //          .reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2))
-          .aggregateByKey((a, b) => (a._1 + b._1, a._2 + b._2))
+          .aggregateByKey((0L,0L))((a, b) => (a._1 + b._1, a._2 + b._2),(a, b) => (a._1 + b._1, a._2 + b._2))
           .map((row) => List(row._1, row._2._1, row._2._2).mkString(",")).coalesce(1) // 处理文件输入格式
 //        levelStudents.saveAsTextFile(outFiles(1))
 
