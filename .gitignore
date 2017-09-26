@@ -6,6 +6,7 @@
 .idea/*
 target/*
 testData/*
+out/*
 *.iml
 *.swp
  ##filter databfile¡¢sln file##

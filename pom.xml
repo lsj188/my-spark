@@ -27,6 +27,7 @@
         <!--add  maven release-->
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <encoding>UTF-8</encoding>
     </properties>
 
@@ -150,10 +151,18 @@
             <version>${log4j.version}</version>
         </dependency>
 
+        <!--Dataframe，读写文件类型-->
         <dependency>
             <groupId>com.databricks</groupId>
             <artifactId>spark-csv_2.11</artifactId>
             <version>1.5.0</version>
+        </dependency>
+
+        <!--集合类型插件-->
+        <dependency>
+            <groupId>it.unimi.dsi</groupId>
+            <artifactId>fastutil</artifactId>
+            <version>8.1.0</version>
         </dependency>
 
         <!---
@@ -220,10 +229,46 @@
                 </executions>
             </plugin>
 
+
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <!-- MainClass in mainfest make a executable jar -->
+                    <archive>
+                        <manifest>
+                            <mainClass>cn.lsj.rdd.Main</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <!-- bind to the packaging phase -->
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <!--用maven-shade-plugin打包-->
+                <!--mvn clean compile //清除之前target编译文件并重新编译-->
+                <!--mvn clean package //对项目进行打包(因为配置过插件，所以jar包是可执行的)-->
+                <!--mvn clean install //安装项目，然后就可以使用了-->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>1.4</version>
+                <configuration>
+                    <!--这个属性会缩减你的pom文件,会把你依赖的<dependency>干掉，可将其设置为false-->
+                    <createDependencyReducedPom>true</createDependencyReducedPom>
+                </configuration>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -231,6 +276,12 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <!--配置包运行函数-->
+                                    <mainClass>cn.lsj.rdd.Main</mainClass>
+                                </transformer>
+                            </transformers>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
