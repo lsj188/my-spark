@@ -96,6 +96,19 @@
             <artifactId>spark-yarn_2.11</artifactId>
             <version>${spark.version}</version>
         </dependency>
+        <!--<dependency>-->
+        <!--<groupId>org.apache.spark</groupId>-->
+        <!--&lt;!&ndash;需要插件版本需看文档&ndash;&gt;-->
+        <!--&lt;!&ndash;文档：http://spark.apache.org/docs/latest/streaming-programming-guide.html&ndash;&gt;-->
+        <!--<artifactId>spark-streaming-kafka-0-8_2.11</artifactId>-->
+        <!--<version>${spark.version}</version>-->
+        <!--</dependency>-->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-streaming-kafka_2.11</artifactId>
+            <version>1.6.3</version>
+        </dependency>
+
 
         <!--spark end-->
 
@@ -121,6 +134,20 @@
             <version>${hadoop.version}</version>
         </dependency>
         <!--hadoop end-->
+        <!--kafka start-->
+        <!--<dependency>-->
+            <!--<groupId>org.apache.kafka</groupId>-->
+            <!--<artifactId>kafka_2.11</artifactId>-->
+            <!--<version>0.8.2.1</version>-->
+        <!--</dependency>-->
+        <!--kafka end-->
+        <!--redis start-->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <!--redis end-->
 
         <!--jdbc start-->
         <dependency>
@@ -164,6 +191,19 @@
             <artifactId>fastutil</artifactId>
             <version>8.1.0</version>
         </dependency>
+
+        <!--json插件-->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20170516</version>
+        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>net.sf.json-lib</groupId>-->
+            <!--<artifactId>json-lib</artifactId>-->
+            <!--<version>2.4</version>-->
+        <!--</dependency>-->
+
 
         <!---
         引入本地jar
