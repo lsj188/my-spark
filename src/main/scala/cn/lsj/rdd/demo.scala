@@ -3,9 +3,9 @@ package cn.lsj.rdd
 import java.io.IOException
 
 import cn.lsj.tools.FileTools
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.SQLContext
 
 object Main {
     def main(args: Array[String]): Unit = {
@@ -27,9 +27,9 @@ object init {
      * 初使化spark
      **/
     def initSpark(masterUrl: String, appName: String): (SparkContext, SQLContext) = {
-        //    val conf = new SparkConf().setMaster("yarn-client").setAppName("Test")
-        val conf = new SparkConf()
-//          .setMaster(masterUrl).setAppName(appName)
+        val conf = new SparkConf().setMaster("local").setAppName("Test")
+        //        val conf = new SparkConf()
+        //          .setMaster(masterUrl).setAppName(appName)
         //==================优化参数，根据业务及数据量大小调整============================
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer") //序列化类
         // 注册自定义类型，默认只支持常用类型，如有比较复杂的类型及自定义类型需要注册
@@ -97,43 +97,49 @@ class CoursesSum() extends Serializable {
 
         //        val coureseRdd = sc.textFile(inFiles(0) + "\\*").map(_.split(","))
         //wholeTextFiles方法生成的RDD为（K，V）,K为文件名路径，V为整个文件的内容，当小文件多时可以使用
-        val coureseRdd = sc.wholeTextFiles(inFiles(0) + "\\*").flatMap((file)=>for (i <- file._2.split("\n")) yield i.split(","))
+        val coureseRdd = sc.wholeTextFiles(inFiles(0) + "\\*")
+          .flatMap((file) => for (i <- file._2.split("\n")) yield i.split(","))
+
 
         //缓存RDD数据
-        coureseRdd.persist(StorageLevel.MEMORY_AND_DISK)
+//        coureseRdd.persist(StorageLevel.MEMORY_AND_DISK)
+
 
         //按类型和级别统计人数
         val students = coureseRdd
-          .map((cols: Array[String]) => ((cols(0), cols(1)), cols(6).toLong))
-          .reduceByKey(_ + _)
+          .map((cols: Array[String]) => ((cols(0), cols(1)), (cols(6).toLong,1)))
+          .reduceByKey((a,b)=>(a._1+b._1,a._2+b._2))
           .coalesce(10) //缩减文件数
-          .sortBy((x) => (x._1._1, x._2), false) //降序排序
-          .map((s) => s._1._1 + "," + s._1._2 + "," + s._2).coalesce(1) //处理文件输出格式
+          .sortBy((x) => (x._1._1, x._2._1), false) //降序排序
+          .map((s) => s._1._1 + "," + s._1._2 + "," + s._2._1+","+s._2._2).coalesce(1) //处理文件输出格式
         students.take(20).foreach(println) //取前20条数据打印
-//        students.saveAsTextFile(outFiles(0))
 
 
+        //缓存RDD数据
+        students.persist(StorageLevel.MEMORY_AND_DISK)
+        //        students.saveAsTextFile(outFiles(0))
+
+        
         //按级别统计人数及课程门数
-        val levelStudents = coureseRdd
-          .map((cols) => ((cols(1), cols(3), cols(6).toLong), 1)) //处理为K，V（(level,url,student),1），方便去重
-          .reduceByKey((a, b) => a) //数据去重
-          .map((row) => (row._1._1, (row._1._3, row._2))) //重新构建K，V()
-//          .reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2))
-          .aggregateByKey((0L,0L))((a, b) => (a._1 + b._1, a._2 + b._2),(a, b) => (a._1 + b._1, a._2 + b._2))
+        val levelStudents = students
+          .map((row) => {val cols=row.split(",");(cols(1), (cols(2).toLong, cols(3).toLong))}) //重新构建K，V()
+          //          .reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2))
+          //当输入类型与输出类型不同时可使用aggregateByKey减少创建对象的开销
+          .aggregateByKey((0L, 0L))((a, b) => (a._1 + b._1, a._2 + b._2), (a, b) => (a._1 + b._1, a._2 + b._2))
           .map((row) => List(row._1, row._2._1, row._2._2).mkString(",")).coalesce(1) // 处理文件输入格式
-//        levelStudents.saveAsTextFile(outFiles(1))
+        //        levelStudents.saveAsTextFile(outFiles(1))
 
         val leftRdd = students.map((line) => {
             val cols = line.split(",")
             (cols(1), cols)
         }) //处理成可关联的K，V
-//        leftRdd.saveAsTextFile(outFiles(3))
+        //        leftRdd.saveAsTextFile(outFiles(3))
 
         val rightRdd = levelStudents.union(sc.parallelize(Seq(List("未知", "123", "456").mkString(","), List("未知1", "1231", "4561").mkString(",")))).map((line) => {
             val cols = line.split(",")
             (cols(0), cols)
         }) //处理成可关联的K，V
-//        leftRdd.saveAsTextFile(outFiles(4))
+        //        leftRdd.saveAsTextFile(outFiles(4))
 
 
         //==================join===================
@@ -184,7 +190,7 @@ class CoursesSum() extends Serializable {
 
 
 
-//        Thread.sleep(10000000)
+        Thread.sleep(10000000)
         sc.stop()
     }
 
