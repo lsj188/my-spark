@@ -26,8 +26,8 @@ object UserClickCountAnalytics {
         val topics = Set("user_events")
         val brokers = "127.0.0.1:9092"
         val groupid = "consumer_group1"
-        val kafkaParams = HashMap[String, String]("metadata.broker.list" -> brokers,
-            "serializer.class" -> "kafka.serializer.StringEncoder", "group.id" -> groupid)
+
+        val kafkaParams = HashMap[String, String]("metadata.broker.list" -> brokers, "serializer.class" -> "kafka.serializer.StringEncoder", "group.id" -> groupid)
 
         val dbIndex = 1
         val clickHashKey = "app::users::click"
@@ -40,7 +40,8 @@ object UserClickCountAnalytics {
 
         val events = kafkaStream.transform((rdd) => {
             //更新数据标记
-            kafkaManager.updateZKOffsets(rdd); rdd
+            kafkaManager.updateZKOffsets(rdd);
+            rdd
         }
         ).flatMap(line => {
             val data = new JSONObject(line._2)

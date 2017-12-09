@@ -13,7 +13,7 @@ import scala.reflect.ClassTag
 
 /**
  * 增读取数据标记位，使客户端读取数据不丢失
- * */
+ **/
 class KafkaManager(val kafkaParams: HashMap[String, String]) extends Serializable {
 
     private val kc = new KafkaCluster(kafkaParams)
@@ -41,9 +41,9 @@ class KafkaManager(val kafkaParams: HashMap[String, String]) extends Serializabl
       topics: Set[String]
       ): InputDStream[(K, V)] = {
         val groupId = kafkaParams.get("group.id").get
-        //从zookeeper上读取offset开始消费message
-        //    val messages = {
         val partitionsE = kc.getPartitions(topics)
+
+
         if (partitionsE.isLeft)
             throw new SparkException(s"get kafka partition failed: ${partitionsE.left.get}")
         val partitions = partitionsE.right.get

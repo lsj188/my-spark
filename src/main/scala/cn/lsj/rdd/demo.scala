@@ -119,7 +119,7 @@ class CoursesSum() extends Serializable {
         students.persist(StorageLevel.MEMORY_AND_DISK)
         //        students.saveAsTextFile(outFiles(0))
 
-        
+
         //按级别统计人数及课程门数
         val levelStudents = students
           .map((row) => {val cols=row.split(",");(cols(1), (cols(2).toLong, cols(3).toLong))}) //重新构建K，V()
